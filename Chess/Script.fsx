@@ -6,3 +6,4 @@ open Chess
 open System.IO
 
 File.WriteAllText ("/Users/mpertsov/Projects/Chess/Chess/queens.txt", Queens.show 4 8);;
+File.WriteAllText ("/Users/mpertsov/Projects/Chess/Chess/standard.txt", Board.show Board.standard);;

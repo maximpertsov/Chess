@@ -1,0 +1,6 @@
+/Users/mpertsov/Projects/Chess/Chess/obj/Debug/.NETFramework,Version=v4.0.AssemblyAttribute.fs
+/Users/mpertsov/Projects/Chess/Chess/bin/Debug/nunit.framework.dll
+/Users/mpertsov/Projects/Chess/Chess/bin/Debug/Chess.dll.mdb
+/Users/mpertsov/Projects/Chess/Chess/bin/Debug/Chess.dll
+/Users/mpertsov/Projects/Chess/Chess/obj/Debug/Chess.dll
+/Users/mpertsov/Projects/Chess/Chess/obj/Debug/Chess.dll.mdb
