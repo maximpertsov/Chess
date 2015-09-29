@@ -1,6 +1,7 @@
 ﻿namespace Chess
 
 module Combinatorics =
+
     /// Return all possible sets of size k from a list
     let combos k xs =
         let rec subsets xs =
@@ -21,6 +22,9 @@ module Combinatorics =
                              loop (List.filter (not << List.isEmpty) ps')         
         loop (List.map (fun x -> [x]) xs)
 
+    /// Find all possible 2-element permutations in a list and return the result as list of 2-tuples
+    let permutations2 xs = permutations 2 xs |> (List.map (fun [x1;x2] -> x1,x2))
+
     /// Return all permutations of a list
     let permutations' xs = permutations (List.length xs) xs
 
@@ -32,6 +36,16 @@ module Piece =
     let piece c fig = (c,fig)
 
     let piece' fig c = (fig,c)
+
+    /// Return set of all shortest-distance moves, not factoring in position or chess board configuration
+    let rec possibleMoves1 (p : Piece) =
+        match p with
+        | _, Rook   -> [(1,0);(-1,0);(0,1);(0,-1)]
+        | _, Bishop -> [(1,1);(-1,1);(1,-1);(-1,-1)]
+        | c, Queen  -> List.concat [possibleMoves1 (c, Rook); possibleMoves1 (c, Bishop)]
+        | c, King   -> possibleMoves1 (c, Queen)
+        | _, Knight -> Combinatorics.permutations2 [1;-1;2;-2] |> List.filter (fun (x1,x2) -> abs x1 <> abs x2)
+        | _ -> failwith "Not implemented"
 
     let toString p =
         // Unicode mapping for White Board pieces (Black pieces are the next six codes)
@@ -50,12 +64,18 @@ module Board =
 
     let size (b : board) = Array.length b
  
+    /// Return an empty n x n board
     let empty n : board = [|for _ in [1..n] -> [|for _ in [1..n] -> None|]|]
 
     let get i j (b : board) = Array.get b.[i-1] (j-1)
  
-    let setPiece p i j (b : board) = Array.set b.[i-1] (j-1) (Some p); b
+    /// Return a new board with a new piece in i,j
+    let setPiece p i j (b : board) = Array.mapi (fun i' r -> Array.mapi (fun j' p' ->  if i-1 = i' && j-1 = j' then Some p else p') r) b
+
+    /// Destructive version of setPiece
+    let setPiece' p i j (b : board) = Array.set b.[i-1] (j-1) (Some p); b
  
+    /// Create a standard chess board
     let standard : board = 
         let setPawns c i (b : board) = Array.set b (i-1) [|for _ in b.[i-1] -> Some (c, Piece.Pawn)|]; b
  
@@ -80,26 +100,51 @@ module Board =
         | (c1, _), Some (c2, _) -> c1 = c2
         | _                     -> false
 
-    /// returns a path moves created by moving a piece in series of one space moves in the direction given by (di, dj)
+    /// Check if piece can move once in the direction given by (di, dj). Returns the next position or None.
+    let moveHelper1 p i j b (di, dj) =
+        let i',j' = (i + di, j + dj)
+        if isEnemy p i j b || isOffBoard i' j' b || isAlly p i' j' b 
+        then None
+        else Some (i',j')        
+
+    /// returns a set of moves created by moving a piece in series of one space moves in the direction given by (di, dj)
     /// move stops the pieces reaches another piece of the same color, the end of the board, or captures another piece
     let moveHelper p i j b (di, dj) =
-        let rec loop i j ms =
-            let i',j' = (i + di, j + dj)
-            if isEnemy p i j b || isOffBoard i' j' b || isAlly p i' j' b 
-            then ms
-            else loop i' j' ((i',j')::ms)
-        loop i j []
+        let rec loop (i,j) ms =
+            match moveHelper1 p i j b (di,dj) with
+            | Some m -> loop m (Set.add m ms)
+            | None   -> ms
+        loop (i,j) Set.empty
 
-    /// returns the legal moves of a piece at a given position on the board
+
+(*
+    let rec legalMoves' p i j b =
+        let orthogonals = [(1,0);(-1,0);(0,1);(0,-1)]
+        let diagonals   = [(1,1);(-1,1);(1,-1);(-1,-1)]
+        let eightways   = (orthogonals @ diagonals)
+        let knightmoves = Combinatorics.permutations2 [1;-1;2;-2] |> List.filter (fun (x1,x2) -> abs x1 <> abs x2)
+        let move1 p = Set.ofList << (List.collect ((Option.toList) << (moveHelper1 p i j b)))
+        let moveN p = Set.unionMany << (List.map (moveHelper p i j b))
+        match p with
+        | _, Piece.Rook   -> moveN p orthogonals
+        | _, Piece.Bishop -> moveN p diagonals
+        | _, Piece.Queen  -> moveN p eightways
+        | _, Piece.King   -> move1 p eightways
+        | _, Piece.Knight -> move1 p knightmoves
+        | _ -> failwith "Not implemented"
+*)
+
+    /// returns the set of legal moves of a piece at a given position on the board
     // TODO: Add ways to prevent moves that put your own king in check, allow for castling, etc
     //       It might be better to add them in a separate function that checks for contextual moves
     let rec legalMoves p i j b =
+        let move1 p = List.collect ((Option.toList) << (moveHelper1 p i j b)) (Piece.possibleMoves1 p) |> Set.ofList
+        let moveN p = List.map (moveHelper p i j b) (Piece.possibleMoves1 p) |> Set.unionMany
         match p with
-        | _, Piece.Rook -> List.collect (moveHelper p i j b) [(1,0);(-1,0);(0,1);(0,-1)]
-        | _, Piece.Bishop -> List.collect (moveHelper p i j b) [(1,1);(-1,1);(-1,1);(-1,-1)]
-        | c, Piece.Queen -> List.collect (fun p' -> legalMoves p' i j b) [(c, Piece.Rook); (c, Piece.Bishop)]
-        | _ -> failwith "Not implemented" 
-
+        | _, Piece.Rook | _, Piece.Bishop | _, Piece.Queen -> moveN p
+        | _, Piece.King | _, Piece.Knight                  -> move1 p
+        | _ -> failwith "Not implemented"
+        
     let private spaceToString s =
         match s with
         | None   -> System.Char.ConvertFromUtf32(65343)
