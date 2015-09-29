@@ -90,6 +90,16 @@ module Board =
             else loop i' j' ((i',j')::ms)
         loop i j []
 
+    /// returns the legal moves of a piece at a given position on the board
+    // TODO: Add ways to prevent moves that put your own king in check, allow for castling, etc
+    //       It might be better to add them in a separate function that checks for contextual moves
+    let rec legalMoves p i j b =
+        match p with
+        | _, Piece.Rook -> List.collect (moveHelper p i j b) [(1,0);(-1,0);(0,1);(0,-1)]
+        | _, Piece.Bishop -> List.collect (moveHelper p i j b) [(1,1);(-1,1);(-1,1);(-1,-1)]
+        | c, Piece.Queen -> List.collect (fun p' -> legalMoves p' i j b) [(c, Piece.Rook); (c, Piece.Bishop)]
+        | _ -> failwith "Not implemented" 
+
     let private spaceToString s =
         match s with
         | None   -> System.Char.ConvertFromUtf32(65343)
