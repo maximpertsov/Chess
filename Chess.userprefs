@@ -2,10 +2,10 @@
   <MonoDevelop.Ide.Workspace ActiveConfiguration="Debug" />
   <MonoDevelop.Ide.Workbench ActiveDocument="Chess/Chess.fs">
     <Files>
-      <File FileName="Chess/Chess.fs" Line="101" Column="43" />
-      <File FileName="Chess/ChessTests.fs" Line="27" Column="49" />
-      <File FileName="Chess/Script.fsx" Line="9" Column="36" />
-      <File FileName="Chess/AssemblyInfo.fs" Line="1" Column="11" />
+      <File FileName="Chess/Chess.fs" Line="101" Column="41" />
+      <File FileName="Chess/ChessTests.fs" Line="1" Column="1" />
+      <File FileName="Chess/Script.fsx" Line="1" Column="1" />
+      <File FileName="Chess/AssemblyInfo.fs" Line="1" Column="1" />
     </Files>
   </MonoDevelop.Ide.Workbench>
   <MonoDevelop.Ide.DebuggingService.Breakpoints>

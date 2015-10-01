@@ -23,7 +23,12 @@ module Combinatorics =
         loop (List.map (fun x -> [x]) xs)
 
     /// Find all possible 2-element permutations in a list and return the result as list of 2-tuples
-    let permutations2 xs = permutations 2 xs |> (List.map (fun [x1;x2] -> x1,x2))
+    let permutations2 xs = 
+        let f p =
+            match p with
+            | [x1;x2] -> x1,x2
+            | _       -> failwith "Encountered list with more or less than two elements"
+        List.map f (permutations 2 xs)
 
     /// Return all permutations of a list
     let permutations' xs = permutations (List.length xs) xs
@@ -137,7 +142,7 @@ module Board =
     /// returns the set of legal moves of a piece at a given position on the board
     // TODO: Add ways to prevent moves that put your own king in check, allow for castling, etc
     //       It might be better to add them in a separate function that checks for contextual moves
-    let rec legalMoves p i j b =
+    let rec legalMoves (p : Piece.Piece) i j b =
         let move1 p = List.collect ((Option.toList) << (moveHelper1 p i j b)) (Piece.possibleMoves1 p) |> Set.ofList
         let moveN p = List.map (moveHelper p i j b) (Piece.possibleMoves1 p) |> Set.unionMany
         match p with
@@ -185,7 +190,7 @@ module Board =
 module Queens =
     module CP = Piece
 
-    // The Black Queen
+    /// The Black Queen
     let BQ = CP.piece CP.Black CP.Queen
      
     let noDiagonalAttacks xs =
@@ -207,16 +212,41 @@ module Queens =
 module KnightsTour =
     module CP = Piece
 
-    // The White Knight
-    let WK = CP.piece CP.White CP.Knight
+    /// The Black Knight
+    let BK = CP.piece CP.Black CP.Knight
 
-    let validDest (i,j) b =
-        let n = Board.size b
-        min i j > 0 && max i j <= n 
+    /// Find a path (if any) starting from position i j, that explores an entire n x n chessboard 
+    let tour i j n =
+        let p = BK
+        let b = Board.empty n
+        let rec loop (path, visited, size) =
+            // Have we explored every square? If so, our tour is complete!
+            if   size = n * n
+            then Some (List.rev path)
+            else let i,j = List.head path
+                 // Otherwise, what new squares can we explore from our current square?
+                 let mset = (Board.legalMoves p i j b) - visited
+                 //printf "squares visited: %i\nnext available squares: %O\n" size mset
+                 if Set.isEmpty mset then None
+                 // Do any of those new squares eventually lead to a complete tour of the chessboard?
+                 else let f ans m = match ans with 
+                                    | None -> loop (m::path, Set.add m visited, size + 1) 
+                                    | _    -> ans
+                      Set.fold f None mset
+        loop ([(i,j)], Set.singleton (i,j), 1)
 
-    let validMoves (i,j) b =
-        let n = Board.size b
+    /// Convert a knight's step into a board string
+    let tourToBoard n (i,j) =
+        Board.setPiece' BK i j (Board.empty n)
 
-        let ms = Combinatorics.permutations 2 [1;-1;2;-2] |> List.filter (fun [i;j] -> abs i <> abs j)
-        let f acc m = if validDest m b then m::acc else acc
-        List.fold f [] (List.map (fun [i;j] -> i,j) ms)
+    /// Show the knight's tour
+    let show ncols i j n =
+        match tour i j n with
+        | None   -> sprintf "Knight cannot explore an entire %ix%i board from position %i,%i\n" n n i j
+        | Some t -> List.map (tourToBoard n) t |> Board.showInColumns ncols
+
+    /// Print the knight's tour
+    let print ncols i j n =
+        match tour i j n with
+        | None   -> printf "Knight cannot explore an entire %ix%i board from position %i,%i\n" n n i j
+        | Some t -> List.map (tourToBoard n) t |> Board.printInColumns ncols
