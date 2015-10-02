@@ -38,9 +38,13 @@ module Piece =
     type Figure = King | Queen | Bishop | Knight | Rook | Pawn
     type Piece  = Color * Figure
 
-    let piece c fig = (c,fig)
+    let piece c fig : Piece = (c,fig)
 
-    let piece' fig c = (fig,c)
+    let piece' fig c : Piece = (fig,c)
+
+    let figure (p : Piece) = snd p
+
+    let color (p: Piece) = fst p
 
     /// Return set of all shortest-distance moves, not factoring in position or chess board configuration
     let rec possibleMoves1 (p : Piece) =
@@ -72,6 +76,16 @@ module Board =
     /// Return an empty n x n board
     let empty n : board = [|for _ in [1..n] -> [|for _ in [1..n] -> None|]|]
 
+    /// Convert a rank and file to a set of coordinates
+    let fromAlgebraic (s : string) = 
+        let cs = s.ToCharArray()
+        let i  = Array.findIndex System.Char.IsDigit cs
+        System.String.Join("", cs.[i..]), System.String.Join("", cs.[0..i-1])
+
+        /// Check if valid coordinates
+        
+
+    /// Return the space located on coordinates i,j of the chessboard
     let get i j (b : board) = Array.get b.[i-1] (j-1)
  
     /// Return a new board with a new piece in i,j
@@ -121,24 +135,6 @@ module Board =
             | None   -> ms
         loop (i,j) Set.empty
 
-
-(*
-    let rec legalMoves' p i j b =
-        let orthogonals = [(1,0);(-1,0);(0,1);(0,-1)]
-        let diagonals   = [(1,1);(-1,1);(1,-1);(-1,-1)]
-        let eightways   = (orthogonals @ diagonals)
-        let knightmoves = Combinatorics.permutations2 [1;-1;2;-2] |> List.filter (fun (x1,x2) -> abs x1 <> abs x2)
-        let move1 p = Set.ofList << (List.collect ((Option.toList) << (moveHelper1 p i j b)))
-        let moveN p = Set.unionMany << (List.map (moveHelper p i j b))
-        match p with
-        | _, Piece.Rook   -> moveN p orthogonals
-        | _, Piece.Bishop -> moveN p diagonals
-        | _, Piece.Queen  -> moveN p eightways
-        | _, Piece.King   -> move1 p eightways
-        | _, Piece.Knight -> move1 p knightmoves
-        | _ -> failwith "Not implemented"
-*)
-
     /// returns the set of legal moves of a piece at a given position on the board
     // TODO: Add ways to prevent moves that put your own king in check, allow for castling, etc
     //       It might be better to add them in a separate function that checks for contextual moves
@@ -150,7 +146,7 @@ module Board =
         | _, Piece.King | _, Piece.Knight                  -> move1 p
         | _ -> failwith "Not implemented"
         
-    let private spaceToString s =
+    let private spaceToString (s:space) =
         match s with
         | None   -> System.Char.ConvertFromUtf32(65343)
         | Some p -> Piece.toString p
@@ -193,21 +189,25 @@ module Queens =
     /// The Black Queen
     let BQ = CP.piece CP.Black CP.Queen
      
-    let noDiagonalAttacks xs =
-        let f i st x = Set.add (x + i) (Set.map ((+) i) st)
-        let unsafeDiags = List.map2 Set.union (List.scan (f 1) Set.empty xs) (List.scan (f -1) Set.empty xs) |> Array.ofList
-        List.mapi (fun i x -> Set.contains x unsafeDiags.[i]) xs |> List.forall (not << id)
-     
-    let queens n = List.filter noDiagonalAttacks (Combinatorics.permutations' [1..n])
+    /// Return all possible ways to arrange n queens on an n x n chessboard, so that no two queens are attacking each other
+    let queens n = 
+        let noDiagonalAttacks xs =
+            let f i st x = Set.add (x + i) (Set.map ((+) i) st)
+            let unsafeDiags = List.map2 Set.union (List.scan (f 1) Set.empty xs) (List.scan (f -1) Set.empty xs) |> Array.ofList
+            List.mapi (fun i x -> Set.contains x unsafeDiags.[i]) xs |> List.forall (not << id)
+        List.filter noDiagonalAttacks (Combinatorics.permutations' [1..n])
 
-    let private queensToBoard p =
-        let n = List.length p
-        let coords = List.mapi (fun j x -> (x,j+1)) p
-        List.fold (fun b (i,j) -> Board.setPiece BQ i j b) (Board.empty n) coords
+    /// Helper method that transforms solutions into Boards, and then applies the specified output function to them
+    let private outputHelper f ncols =
+        let queensToBoard p =
+            let n = List.length p
+            let coords = List.mapi (fun j x -> (x,j+1)) p
+            List.fold (fun b (i,j) -> Board.setPiece BQ i j b) (Board.empty n) coords
+        (f ncols) << (List.map queensToBoard) << queens
 
-    let show ncols = (Board.showInColumns ncols) << (List.map queensToBoard) << queens
+    let show ncols = outputHelper Board.showInColumns ncols //(Board.showInColumns ncols) << (List.map queensToBoard) << queens
 
-    let print ncols = (Board.printInColumns ncols) << (List.map queensToBoard) << queens
+    let print ncols = outputHelper Board.printInColumns ncols //(Board.printInColumns ncols) << (List.map queensToBoard) << queens
 
 module KnightsTour =
     module CP = Piece
@@ -224,14 +224,14 @@ module KnightsTour =
             if   size = n * n
             then Some (List.rev path)
             else let i,j = List.head path
-                 // Otherwise, what new squares can we explore from our current square?
-                 let mset = (Board.legalMoves p i j b) - visited
-                 //printf "squares visited: %i\nnext available squares: %O\n" size mset
+                 let mset = (Board.legalMoves p i j b) - visited 
+                 // What new squares can we explore from our current square?
                  if Set.isEmpty mset then None
-                 // Do any of those new squares eventually lead to a complete tour of the chessboard?
-                 else let f ans m = match ans with 
-                                    | None -> loop (m::path, Set.add m visited, size + 1) 
-                                    | _    -> ans
+                 else let f ans m =
+                          // Do any of those new, unexplored squares eventually lead to a complete tour of the chessboard?
+                          match ans with 
+                          | None -> loop (m::path, Set.add m visited, size + 1) // Not yet, try another square...
+                          | _    -> ans                                         // Found one!
                       Set.fold f None mset
         loop ([(i,j)], Set.singleton (i,j), 1)
 

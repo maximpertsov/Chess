@@ -11,6 +11,8 @@ module BoardTests =
     // Chess pieces
     let black_bishop = CP.Black, CP.Bishop
     let white_bishop = CP.White, CP.Bishop  
+
+    let black_knight = CP.Black, CP.Knight
           
     let black_rook = CP.Black, CP.Rook
 
@@ -55,3 +57,19 @@ module BoardTests =
     let ``Bishop moves freely in diagonal directions and stops when it reaches an enemy piece``() =
         let b = CB.empty 8 |> CB.setPiece white_bishop 2 2 |> CB.setPiece white_pawn 3 7
         Assert.AreEqual(CB.legalMoves black_bishop 5 5 b, Set.ofList ([for i in 2..8 -> i,i]@[for i in 3..8 -> i,8-i+2]) |> Set.remove (5,5))
+
+    [<Test>]
+    let ``Knight's tour explores all squares on a 6x6 board exactly once, and each move is valid knight move``() =
+        let b = Chess.Board.empty 6
+
+        let validTour path = 
+            let f (i,j) next_move = Set.contains next_move (Chess.Board.legalMoves black_knight i j b)   
+            Seq.forall2 f path (List.tail path)
+
+        match Chess.KnightsTour.tour 1 1 6 with
+        | Some path -> 
+            // visited all squares
+            Assert.AreEqual(Set.ofList path, List.collect (fun i -> [for j in [1..6] -> (i,j)]) [1..6] |> Set.ofList)
+            // each move was a valid move
+            Assert.IsTrue(validTour path)
+        | None      -> Assert.Fail()
