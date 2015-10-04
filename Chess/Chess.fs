@@ -40,21 +40,41 @@ module Piece =
 
     let piece c fig : Piece = (c,fig)
 
-    let piece' fig c : Piece = (fig,c)
+    let piece' cStr figStr : Piece = 
+        let c = match System.Char.ToUpper cStr with
+                | 'W' -> White
+                | 'B' -> Black
+                | _   -> failwith "Invalid color: enter 'W' for white or 'B' for black"
+        let fig = match System.Char.ToUpper figStr with
+                  | 'K' -> King
+                  | 'Q' -> Queen
+                  | 'B' -> Bishop
+                  | 'N' -> Knight
+                  | 'R' -> Rook
+                  | 'P' -> Pawn
+                  | _   -> failwith "Invalid piece: enter 'K' (king), 'Q' (queen), 'B' (bishop), 'N' (knight), 'R' (rook), or 'P' (pawn)"
+        (c, fig)
 
     let figure (p : Piece) = snd p
 
     let color (p: Piece) = fst p
 
-    /// Return set of all shortest-distance moves, not factoring in position or chess board configuration
-    let rec possibleMoves1 (p : Piece) =
+    let sameColor p1 p2 = color p1 = color p2
+
+    /// Return set of all shortest-distance moves, not factoring in position or chessboard configuration
+    // TODO: consider adding a "possibleCapture" function that separately indicates what moves a piece can capture other pieces with
+    //     : -- a "possibleCapture" function would make coding for pawn movement much less convoluted, and provide an approach to coding
+    //     : -- other boardgame pieces with capturing movements that are different from their normal movements, 
+    //     : -- such as the Chinese Chess cannon
+    let rec possibleSteps (p : Piece) =
         match p with
         | _, Rook   -> [(1,0);(-1,0);(0,1);(0,-1)]
         | _, Bishop -> [(1,1);(-1,1);(1,-1);(-1,-1)]
-        | c, Queen  -> List.concat [possibleMoves1 (c, Rook); possibleMoves1 (c, Bishop)]
-        | c, King   -> possibleMoves1 (c, Queen)
+        | c, Queen  -> List.concat [possibleSteps (c, Rook); possibleSteps (c, Bishop)]
+        | c, King   -> possibleSteps (c, Queen)
         | _, Knight -> Combinatorics.permutations2 [1;-1;2;-2] |> List.filter (fun (x1,x2) -> abs x1 <> abs x2)
-        | _ -> failwith "Not implemented"
+        | White, Pawn -> [for j in [-1..1] -> (1,j)]
+        | Black, Pawn -> possibleSteps (White, Pawn) |> List.map (fun (i,j) -> -1*i,j)
 
     let toString p =
         // Unicode mapping for White Board pieces (Black pieces are the next six codes)
@@ -70,29 +90,42 @@ module Piece =
 module Board =
     type space = Piece.Piece option
     type board = space[][]
+    type position = int * int
 
     let size (b : board) = Array.length b
  
     /// Return an empty n x n board
     let empty n : board = [|for _ in [1..n] -> [|for _ in [1..n] -> None|]|]
 
-    /// Convert a rank and file to a set of coordinates
-    let fromAlgebraic (s : string) = 
-        let cs = s.ToCharArray()
-        let i  = Array.findIndex System.Char.IsDigit cs
-        System.String.Join("", cs.[i..]), System.String.Join("", cs.[0..i-1])
+    //let regex = System.Text.RegularExpressions.Regex.Match("Kn3","[A-Z]?[a-n][0-9]{1,2}")
 
-        /// Check if valid coordinates
+    /// Convert a rank and file to a set of coordinates (for now does not allow file labels beyond the letter Z)
+//    let positionFromAlgebraic (s : string) =
+//        let s' = s.ToLower()
+//        try 
+//            let file = s'.[0]
+//            let rank = System.Double.TryParse s'.[1..]
+//        with
+//        | _ -> failwith "Invalid algebraic notation"
+
+        // Check if valid coordinates
         
-
     /// Return the space located on coordinates i,j of the chessboard
-    let get i j (b : board) = Array.get b.[i-1] (j-1)
+    let get (b : board) (pos : position) = 
+        let i,j = pos
+        Array.get b.[i-1] (j-1)
  
     /// Return a new board with a new piece in i,j
-    let setPiece p i j (b : board) = Array.mapi (fun i' r -> Array.mapi (fun j' p' ->  if i-1 = i' && j-1 = j' then Some p else p') r) b
+    let setPiece (b : board) p (i, j) = Array.mapi (fun i' r -> Array.mapi (fun j' p' ->  if i-1 = i' && j-1 = j' then Some p else p') r) b
+
+    /// Return a new board with many new pieces
+    let setPieces (b : board) = Seq.fold (fun b' (p, i, j) -> setPiece b' p (i,j)) b
 
     /// Destructive version of setPiece
-    let setPiece' p i j (b : board) = Array.set b.[i-1] (j-1) (Some p); b
+    let setPiece' (b : board) p (i, j) = Array.set b.[i-1] (j-1) (Some p); b
+
+    /// Destructively set many pieces onto the board
+    let setPieces' (b : board) = Seq.fold (fun b' (p, i, j) -> setPiece' b' p (i,j)) b
  
     /// Create a standard chess board
     let standard : board = 
@@ -105,47 +138,55 @@ module Board =
         let white, black = Piece.White, Piece.Black
         empty 8 |> setBackRow white 1 |> setPawns white 2 |> setPawns black 7 |> setBackRow black 8
 
-    let isOffBoard i j b =
+    let isOffBoard b (pos : position) =
+        let i,j = pos
         let n = size b
         i < 1 || j < 1 || i > n || j > n
 
-    let isEnemy p i j b =
-        match p, get i j b with
-        | (c1, _), Some (c2, _) -> c1 <> c2
-        | _                     -> false
+    let isEnemy b p (pos : position) =
+        match get b pos with
+        | Some p' -> not (Piece.sameColor p p')
+        | _       -> false
 
-    let isAlly p i j b =
-        match p, get i j b with
-        | (c1, _), Some (c2, _) -> c1 = c2
-        | _                     -> false
+    let isAlly b p (pos : position) =
+        match get b pos with
+        | Some p' -> Piece.sameColor p p'
+        | _       -> false
 
-    /// Check if piece can move once in the direction given by (di, dj). Returns the next position or None.
-    let moveHelper1 p i j b (di, dj) =
-        let i',j' = (i + di, j + dj)
-        if isEnemy p i j b || isOffBoard i' j' b || isAlly p i' j' b 
-        then None
-        else Some (i',j')        
+    let isEmpty b (pos : position) = Option.isNone (get b pos)    
 
-    /// returns a set of moves created by moving a piece in series of one space moves in the direction given by (di, dj)
+    /// returns a set of positions created by moving a piece n times in series of one space moves in the direction given by (di, dj)
     /// move stops the pieces reaches another piece of the same color, the end of the board, or captures another piece
-    let moveHelper p i j b (di, dj) =
-        let rec loop (i,j) ms =
-            match moveHelper1 p i j b (di,dj) with
-            | Some m -> loop m (Set.add m ms)
-            | None   -> ms
-        loop (i,j) Set.empty
+    let moveN b n p pos delta =
+        let (++) (i, j) (di, dj) = (i + di, j + dj)
+        let move1 pos =
+            let pos' = pos ++ delta
+            if isEnemy b p pos || isOffBoard b pos' || isAlly b p pos'
+            then None
+            else Some pos'
+        let rec loop (n, pos, posns) =
+            match move1 pos with
+            | Some pos' -> if n > 0 then loop (n-1, pos', Set.add pos' posns) else posns
+            | None      -> posns
+        loop (n, pos, Set.empty)
 
     /// returns the set of legal moves of a piece at a given position on the board
-    // TODO: Add ways to prevent moves that put your own king in check, allow for castling, etc
-    //       It might be better to add them in a separate function that checks for contextual moves
-    let rec legalMoves (p : Piece.Piece) i j b =
-        let move1 p = List.collect ((Option.toList) << (moveHelper1 p i j b)) (Piece.possibleMoves1 p) |> Set.ofList
-        let moveN p = List.map (moveHelper p i j b) (Piece.possibleMoves1 p) |> Set.unionMany
-        match p with
-        | _, Piece.Rook | _, Piece.Bishop | _, Piece.Queen -> moveN p
-        | _, Piece.King | _, Piece.Knight                  -> move1 p
-        | _ -> failwith "Not implemented"
-        
+    let rec legalMoves b (p : Piece.Piece) pos =
+        let i,j = pos
+        let move n p = List.map (moveN b n p pos) (Piece.possibleSteps p) |> Set.unionMany
+        match Piece.figure p with
+        | Piece.Rook | Piece.Bishop | Piece.Queen -> move (size b) p        // TODO: add castling for Rook
+        | Piece.King | Piece.Knight               -> move 1 p               // TODO: add castling for King
+        | Piece.Pawn ->                                                     // TODO: add en passant for Pawn
+            let isInitPos =
+                match Piece.color p with
+                | Piece.White -> i = 2
+                | Piece.Black -> i = size b - 1
+            move 2 p 
+            |> Set.filter (fun (i',j') -> (j = j' && isEmpty b (i', j')) || (j <> j' && isEnemy b p (i', j'))) 
+            // only allow two-space moves when in initial position
+            |> Set.filter (fun (i',j') -> (abs (i' - i) < 2 || isInitPos) && abs (j' - j) < 2)
+
     let private spaceToString (s:space) =
         match s with
         | None   -> System.Char.ConvertFromUtf32(65343)
@@ -202,7 +243,7 @@ module Queens =
         let queensToBoard p =
             let n = List.length p
             let coords = List.mapi (fun j x -> (x,j+1)) p
-            List.fold (fun b (i,j) -> Board.setPiece BQ i j b) (Board.empty n) coords
+            List.fold (fun b (i,j) -> Board.setPiece b BQ (i,j)) (Board.empty n) coords
         (f ncols) << (List.map queensToBoard) << queens
 
     let show ncols = outputHelper Board.showInColumns ncols //(Board.showInColumns ncols) << (List.map queensToBoard) << queens
@@ -215,38 +256,40 @@ module KnightsTour =
     /// The Black Knight
     let BK = CP.piece CP.Black CP.Knight
 
-    /// Find a path (if any) starting from position i j, that explores an entire n x n chessboard 
-    let tour i j n =
+    /// Find a path (if any) starting from a given position that explores an entire n x n chessboard 
+    let tour pos n =
         let p = BK
         let b = Board.empty n
         let rec loop (path, visited, size) =
             // Have we explored every square? If so, our tour is complete!
             if   size = n * n
             then Some (List.rev path)
-            else let i,j = List.head path
-                 let mset = (Board.legalMoves p i j b) - visited 
-                 // What new squares can we explore from our current square?
-                 if Set.isEmpty mset then None
-                 else let f ans m =
-                          // Do any of those new, unexplored squares eventually lead to a complete tour of the chessboard?
+            // What new squares can we explore from our current square? 
+            else let mset = (Board.legalMoves b p (List.head path)) - visited            
+                 if Set.isEmpty mset 
+                 then None
+                 // Do any of those new, unexplored squares eventually lead to a complete tour of the chessboard?
+                 else let f ans pos' =        
                           match ans with 
-                          | None -> loop (m::path, Set.add m visited, size + 1) // Not yet, try another square...
-                          | _    -> ans                                         // Found one!
+                          | None -> loop (pos'::path, Set.add pos' visited, size + 1) // Not yet, try another square...
+                          | _    -> ans                                               // Found one!
                       Set.fold f None mset
-        loop ([(i,j)], Set.singleton (i,j), 1)
+        loop ([pos], Set.singleton pos, 1)
 
     /// Convert a knight's step into a board string
-    let tourToBoard n (i,j) =
-        Board.setPiece' BK i j (Board.empty n)
+    let tourToBoard n pos =
+        Board.setPiece' (Board.empty n) BK pos 
 
     /// Show the knight's tour
-    let show ncols i j n =
-        match tour i j n with
+    let show ncols pos n =
+        let i,j = pos
+        match tour pos n with
         | None   -> sprintf "Knight cannot explore an entire %ix%i board from position %i,%i\n" n n i j
         | Some t -> List.map (tourToBoard n) t |> Board.showInColumns ncols
 
     /// Print the knight's tour
-    let print ncols i j n =
-        match tour i j n with
+    let print ncols pos n =
+        let i,j = pos
+        match tour pos n with
         | None   -> printf "Knight cannot explore an entire %ix%i board from position %i,%i\n" n n i j
         | Some t -> List.map (tourToBoard n) t |> Board.printInColumns ncols

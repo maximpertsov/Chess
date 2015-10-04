@@ -36,37 +36,68 @@ module BoardTests =
     [<Test>]
     let ``Piece stops moving once it reached end of board``() =
         let b  = CB.empty 8
-        Assert.AreEqual(CB.moveHelper black_rook 3 2 b (1,0), Set.ofList [for i in 4..8 -> i,2])
+        Assert.AreEqual(CB.moveN b 8 black_rook (3, 2) (1,0), Set.ofList [for i in 4..8 -> i,2])
 
     [<Test>]
     let ``Piece stops moving before it reaches another piece of the same color``() =
-        let b = CB.empty 8 |> CB.setPiece black_king 3 5
-        Assert.AreEqual(CB.moveHelper black_rook 3 2 b (0,1), Set.ofList [(3,3);(3,4)])    
-
-    [<Test>]
-    let ``Rook moves freely in orthogonal directions and stops before it reaches an ally piece``() =
-        let b = CB.empty 8 |> CB.setPiece black_king 3 5 |> CB.setPiece black_pawn 1 2
-        Assert.AreEqual(CB.legalMoves black_rook 3 2 b, Set.ofList ([for j in 1..4 -> 3,j]@[for i in 2..8 -> i,2]) |> Set.remove (3,2))
+        let b = CB.setPiece (CB.empty 8) black_king (3, 5)
+        Assert.AreEqual(CB.moveN b 8 black_rook (3, 2) (0,1), Set.ofList [(3,3);(3,4)])    
 
     [<Test>]
     let ``Piece stops moving when it reaches another piece of the opposite color``() =
-        let b = CB.empty 8 |> CB.setPiece white_bishop 2 2
-        Assert.AreEqual(CB.moveHelper black_bishop 5 5 b (-1,-1), Set.ofList [for i in 2..4 -> i,i]) 
+        let b = CB.setPiece (CB.empty 8) white_bishop (2, 2)
+        Assert.AreEqual(CB.moveN b 8 black_bishop (5, 5) (-1,-1), Set.ofList [for i in 2..4 -> i,i]) 
+
+    [<Test>]
+    let ``Rook moves freely in orthogonal directions and stops before it reaches an ally piece``() =
+        let b = CB.setPieces (CB.empty 8) [(black_king, 3, 5);(black_pawn, 1, 2)]
+        Assert.AreEqual(CB.legalMoves b black_rook (3,2), Set.ofList ([for j in 1..4 -> 3,j]@[for i in 2..8 -> i,2]) |> Set.remove (3,2))
 
     [<Test>]
     let ``Bishop moves freely in diagonal directions and stops when it reaches an enemy piece``() =
-        let b = CB.empty 8 |> CB.setPiece white_bishop 2 2 |> CB.setPiece white_pawn 3 7
-        Assert.AreEqual(CB.legalMoves black_bishop 5 5 b, Set.ofList ([for i in 2..8 -> i,i]@[for i in 3..8 -> i,8-i+2]) |> Set.remove (5,5))
+        let ps = [(white_bishop, 2, 2);(white_pawn, 3, 7)]
+        let b = CB.setPieces (CB.empty 8) ps
+        Assert.AreEqual(CB.legalMoves b black_bishop (5,5), Set.ofList ([for i in 2..8 -> i,i]@[for i in 3..8 -> i,8-i+2]) |> Set.remove (5,5))
+
+    [<Test>]
+    let ``White pawn can move up one space or capture the piece diagonally in above it``() =
+        let b =  CB.setPiece (CB.empty 8) black_bishop (4, 4)
+        Assert.AreEqual(CB.legalMoves b white_pawn (3,3), Set.ofList [(4,3);(4,4)])
+
+    [<Test>]
+    let ``Black pawn can move down one space or capture the piece diagonally below it``() =
+        let b = CB.setPiece (CB.empty 8) white_bishop (2, 4)
+        Assert.AreEqual(CB.legalMoves b black_pawn (3,5), Set.ofList [(2,4);(2,5)])
+
+    [<Test>]
+    let ``White pawn can move up two spaces if in 2nd rank from bottom``() =
+        let b =  CB.empty 8
+        Assert.AreEqual(CB.legalMoves b white_pawn (2,3), Set.ofList [(3,3);(4,3)])
+
+    [<Test>]
+    let ``Black pawn can move up two spaces if in 2nd rank from top``() =
+        let b =  CB.empty 8
+        Assert.AreEqual(CB.legalMoves b black_pawn (7,3), Set.ofList [(6,3);(5,3)])
+
+    [<Test>]
+    let ``Pawn cannot capture piece two spaces above it when moving from initial position``() =
+        let b =  CB.setPiece (CB.empty 8) white_pawn (5,3) 
+        Assert.AreEqual(CB.legalMoves b black_pawn (7,3), Set.ofList [(6,3)])
+
+    [<Test>]
+    let ``Black pawn can capture either piece diagonally below it, but not the piece directly below it``() =
+        let b = CB.setPieces (CB.empty 8) [for j in 4..6 -> (white_bishop, 2, j)]
+        Assert.AreEqual(CB.legalMoves b black_pawn (3,5), Set.ofList [(2,4);(2,6)])
 
     [<Test>]
     let ``Knight's tour explores all squares on a 6x6 board exactly once, and each move is valid knight move``() =
         let b = Chess.Board.empty 6
 
         let validTour path = 
-            let f (i,j) next_move = Set.contains next_move (Chess.Board.legalMoves black_knight i j b)   
+            let f (i,j) next_move = Set.contains next_move (Chess.Board.legalMoves b black_knight (i,j))   
             Seq.forall2 f path (List.tail path)
 
-        match Chess.KnightsTour.tour 1 1 6 with
+        match Chess.KnightsTour.tour (1,1) 6 with
         | Some path -> 
             // visited all squares
             Assert.AreEqual(Set.ofList path, List.collect (fun i -> [for j in [1..6] -> (i,j)]) [1..6] |> Set.ofList)

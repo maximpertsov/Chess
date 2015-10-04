@@ -5,5 +5,4 @@
 open Chess
 open System.IO
 
-File.WriteAllText ("/Users/mpertsov/Projects/Chess/Chess/knight.txt", KnightsTour.show 4 1 1 5);;
 //File.WriteAllText ("/Users/mpertsov/Projects/Chess/Chess/standard.txt", Board.show Board.standard);;
