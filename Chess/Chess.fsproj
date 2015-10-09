@@ -43,6 +43,9 @@
   <ItemGroup>
     <None Include="packages.config" />
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="Combinatorics.fs" />
+    <Compile Include="Piece.fs" />
+    <Compile Include="Board.fs" />
     <Compile Include="Chess.fs" />
     <Compile Include="ChessTests.fs" />
     <Compile Include="Script.fsx" />

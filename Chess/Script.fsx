@@ -1,7 +1,7 @@
 ﻿// Learn more about F# at http://fsharp.net. See the 'F# Tutorial' project
 // for more guidance on F# programming.
 
-#load "Chess.fs"
+#load "Combinatorics.fs" "Piece.fs" "Board.fs" "Chess.fs"
 open Chess
 open System.IO
 

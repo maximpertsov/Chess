@@ -90,17 +90,22 @@ module BoardTests =
         Assert.AreEqual(CB.legalMoves b black_pawn (3,5), Set.ofList [(2,4);(2,6)])
 
     [<Test>]
-    let ``Knight's tour explores all squares on a 6x6 board exactly once, and each move is valid knight move``() =
-        let b = Chess.Board.empty 6
+    let ``Knight's tour explores all squares on a 5x5 board exactly once, and each move is valid knight move``() =
+        let sz = 5
+        let b = Chess.Board.empty sz
 
         let validTour path = 
             let f (i,j) next_move = Set.contains next_move (Chess.Board.legalMoves b black_knight (i,j))   
             Seq.forall2 f path (List.tail path)
 
-        match Chess.KnightsTour.tour (1,1) 6 with
+        match Chess.KnightsTour.tour (1,1) sz with
         | Some path -> 
             // visited all squares
-            Assert.AreEqual(Set.ofList path, List.collect (fun i -> [for j in [1..6] -> (i,j)]) [1..6] |> Set.ofList)
+            Assert.AreEqual(Set.ofList path, List.collect (fun i -> [for j in [1..sz] -> (i,j)]) [1..sz] |> Set.ofList)
             // each move was a valid move
             Assert.IsTrue(validTour path)
         | None      -> Assert.Fail()
+
+    [<Test>]
+    let ``There are 92 possible ways to place 8 queens on an 8x8 chessboard so that no two queens are attacking each other``() =
+        Assert.AreEqual(Queens.queens 8 |> List.length, 92)
