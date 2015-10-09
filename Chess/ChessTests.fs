@@ -9,17 +9,17 @@ module BoardTests =
     module CP = Chess.Piece
 
     // Chess pieces
-    let black_bishop = CP.Black, CP.Bishop
-    let white_bishop = CP.White, CP.Bishop  
+    let black_bishop = Piece.create CP.Black CP.Bishop
+    let white_bishop = Piece.create CP.White CP.Bishop  
 
-    let black_knight = CP.Black, CP.Knight
+    let black_knight = Piece.create CP.Black CP.Knight
           
-    let black_rook = CP.Black, CP.Rook
+    let black_rook = Piece.create CP.Black CP.Rook
 
-    let black_king = CP.Black, CP.King
+    let black_king = Piece.create CP.Black CP.King
 
-    let white_pawn = CP.White, CP.Pawn
-    let black_pawn = CP.Black, CP.Pawn
+    let white_pawn = Piece.create CP.White CP.Pawn
+    let black_pawn = Piece.create CP.Black CP.Pawn
 
     // Parametrized empty board test
     let emptyBoardTest n =

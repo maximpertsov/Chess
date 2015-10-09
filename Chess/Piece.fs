@@ -3,28 +3,39 @@
 module Piece =
     type Color  = White | Black
     type Figure = King | Queen | Bishop | Knight | Rook | Pawn
-    type Piece  = Color * Figure //TODO: make this a record
+    type Piece  = private {color: Color; figure: Figure}
+
+    let create (c:Color) (fig:Figure) : Piece = {color=c; figure=fig}
+
+    let create' (color:string) (figure:string) : Piece =
+        let c = 
+            match String.map System.Char.ToLower color with
+            | "w" | "white" -> White
+            | "b" | "black" -> Black
+            | _  -> failwith "Invalid color: enter 'W' for white or 'B' for black"
+        let fig =  
+            match String.map System.Char.ToLower figure with
+            | "k" | "king"   -> King
+            | "q" | "queen"  -> Queen
+            | "b" | "bishop" -> Bishop
+            | "n" | "knight" -> Knight
+            | "r" | "rook"   -> Rook
+            | "p" | "pawn"   -> Pawn
+            | _  -> failwith "Invalid piece: enter 'K' (king), 'Q' (queen), 'B' (bishop), 'N' (knight), 'R' (rook), or 'P' (pawn)"
+        {color=c; figure=fig}
+
+    let create'' (color_figure:string) : Piece =
+        match color_figure.Split [|' ';','|] with
+        | [|arg1; arg2|] -> 
+            try 
+                create' arg1 arg2
+            with
+            | _ -> create' arg2 arg1
+        | _ -> failwith "Invalid piece"
     
-    let piece c fig : Piece = (c,fig)
+    let figure (p : Piece) = p.figure
 
-    let piece' cStr figStr : Piece = 
-        let c = match System.Char.ToUpper cStr with
-                | 'W' -> White
-                | 'B' -> Black
-                | _   -> failwith "Invalid color: enter 'W' for white or 'B' for black"
-        let fig = match System.Char.ToUpper figStr with
-                  | 'K' -> King
-                  | 'Q' -> Queen
-                  | 'B' -> Bishop
-                  | 'N' -> Knight
-                  | 'R' -> Rook
-                  | 'P' -> Pawn
-                  | _   -> failwith "Invalid piece: enter 'K' (king), 'Q' (queen), 'B' (bishop), 'N' (knight), 'R' (rook), or 'P' (pawn)"
-        (c, fig)
-
-    let figure (p : Piece) = snd p
-
-    let color (p: Piece) = fst p
+    let color (p: Piece) = p.color
 
     let sameColor p1 p2 = color p1 = color p2
 
@@ -34,22 +45,22 @@ module Piece =
     //     : -- other boardgame pieces with capturing movements that are different from their normal movements, 
     //     : -- such as the Chinese Chess cannon
     let rec possibleSteps (p : Piece) =
-        match p with
+        match (color p, figure p) with
         | _, Rook   -> [(1,0);(-1,0);(0,1);(0,-1)]
         | _, Bishop -> [(1,1);(-1,1);(1,-1);(-1,-1)]
-        | c, Queen  -> possibleSteps (c, Rook) @ possibleSteps (c, Bishop)
-        | c, King   -> possibleSteps (c, Queen)
+        | c, Queen  -> possibleSteps (create c Rook) @ possibleSteps (create c Bishop)
+        | c, King   -> possibleSteps (create c Queen)
         | _, Knight -> [for (i,j) in Combinatorics.permutations2 [1;-1;2;-2] do if abs i <> abs j then yield (i,j)]
         | White, Pawn -> [for j in [-1..1] -> (1,j)]
-        | Black, Pawn -> [for (i,j) in possibleSteps (White, Pawn) -> -i,j]
+        | Black, Pawn -> [for (i,j) in possibleSteps (create White Pawn) -> -i,j]
 
     let toString p =
         // Unicode mapping for White Board pieces (Black pieces are the next six codes)
         let unicodeMap = Map.ofList (List.zip [King; Queen; Rook; Bishop; Knight; Pawn;] [9812 .. 9817])
 
         let rec unicodeNum p = 
-            match p with
-            | Black, fig -> unicodeNum (White, fig) + 6
+            match (color p, figure p) with
+            | Black, fig -> unicodeNum (create White fig) + 6
             | _, fig     -> Map.find fig unicodeMap
             
         System.Char.ConvertFromUtf32 (unicodeNum p)

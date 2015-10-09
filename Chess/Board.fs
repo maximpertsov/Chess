@@ -47,12 +47,12 @@ module Board =
  
     /// Create a standard chess board
     let standard : board = 
-        let setPawns c i (b : board) = Array.set b (i-1) [|for _ in b.[i-1] -> Some (c, Piece.Pawn)|]; b
+        let setPawns c i (b : board) = Array.set b (i-1) [|for _ in b.[i-1] -> Some (Piece.create c Piece.Pawn)|]; b
  
         let setBackRow c i (b : board) =
             let rnc = [|Piece.Rook; Piece.Knight; Piece.Bishop|]
             let qk  = [|Piece.Queen; Piece.King|]
-            Array.concat [rnc; qk; Array.rev rnc] |> Array.map (Some << Piece.piece c) |> Array.set b (i-1); b
+            Array.concat [rnc; qk; Array.rev rnc] |> Array.map (Some << Piece.create c) |> Array.set b (i-1); b
 
         let white, black = Piece.White, Piece.Black
 
@@ -112,18 +112,20 @@ module Board =
     //  TODO: test this function!!!
     let rec legalMoves' b moves (p : Piece.Piece) pos =
         let i,j = pos
-        match p with
+        match (Piece.color p, Piece.figure p) with
         | Piece.White, Piece.Pawn -> 
             match moves with
-            | (Move ((Piece.Black, Piece.Pawn), (i',j'), (i'',_)))::_ -> if   i = size b - 3 && i' = size b - 3 && i'' = size b - 1 && abs (j - j') = 1
-                                                                         then Set.add (i'+1,j') (legalMoves b p pos)
-                                                                         else legalMoves b p pos
+            | (Move (p', (i',j'), (i'',_)))::_ -> 
+                if not (Piece.sameColor p p') && i = size b - 3 && i' = size b - 3 && i'' = size b - 1 && abs (j - j') = 1
+                    then Set.add (i'+1,j') (legalMoves b p pos)
+                    else legalMoves b p pos
             | _ -> legalMoves b p pos
         | Piece.Black, Piece.Pawn -> 
             match moves with
-            | (Move ((Piece.White, Piece.Pawn), (i',j'), (i'',_)))::_ -> if   i = 4 && i' = 4 && i'' = 2 && abs (j - j') = 1
-                                                                         then Set.add (i'-1,j') (legalMoves b p pos)
-                                                                         else legalMoves b p pos
+            | (Move (p', (i',j'), (i'',_)))::_ -> 
+                if not (Piece.sameColor p p') && i = 4 && i' = 4 && i'' = 2 && abs (j - j') = 1
+                    then Set.add (i'-1,j') (legalMoves b p pos)
+                    else legalMoves b p pos
             | _ -> legalMoves b p pos
         | _ -> legalMoves b p pos      
 

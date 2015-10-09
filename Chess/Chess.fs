@@ -1,10 +1,8 @@
 ﻿namespace Chess
 
 module Queens =
-    module CP = Piece
-
     /// The Black Queen
-    let BQ = CP.piece CP.Black CP.Queen
+    let private black_queen = Piece.create'' "black queen"
      
     /// Return all possible ways to arrange n queens on an n x n chessboard, so that no two queens are attacking each other
     let queens n = 
@@ -22,7 +20,7 @@ module Queens =
     let private outputHelper f column_count =
         let queensToBoard p =
             let posns = List.mapi (fun col row -> (row, col+1)) p
-            List.fold (fun board pos -> Board.setPiece board BQ pos) (Board.empty (List.length p)) posns
+            List.fold (fun board pos -> Board.setPiece board black_queen pos) (Board.empty (List.length p)) posns
         (f column_count) << (List.map queensToBoard) << queens
 
     let show column_count = outputHelper Board.showInColumns column_count
@@ -30,34 +28,29 @@ module Queens =
     let print column_count = outputHelper Board.printInColumns column_count
 
 module KnightsTour =
-    module CP = Piece
-
     /// The Black Knight
-    let BK = CP.piece CP.Black CP.Knight
+    let private black_knight = Piece.create'' "black knight"
 
     /// Find a path (if any) starting from a given position that explores an entire n x n chessboard 
     let tour pos n =
-        let p = BK
-        let b = Board.empty n
+        let p = black_knight
         let rec loop (path, visited, size) =
             // Have we explored every square? If so, our tour is complete!
-            if   size = n * n
-            then Some (List.rev path)
-            // What new squares can we explore from our current square? 
-            else let mset = (Board.legalMoves b p (List.head path)) - visited            
-                 if Set.isEmpty mset 
-                 then None
+            if size = n * n then Some (List.rev path)
+            // What new squares can we explore from our current square?
+            else let new_moves = Board.legalMoves (Board.empty n) p (List.head path) - visited            
+                 if Set.isEmpty new_moves then None
                  // Do any of those new, unexplored squares eventually lead to a complete tour of the chessboard?
-                 else let f ans pos' =        
-                          match ans with 
+                 else let f path' pos' =        
+                          match path' with 
                           | None -> loop (pos'::path, Set.add pos' visited, size + 1) // Not yet, try another square...
-                          | _    -> ans                                               // Found one!
-                      Set.fold f None mset
-        loop ([pos], Set.singleton pos, 1)
+                          | _    -> path'                                             // Found one!
+                      Set.fold f None new_moves
+        loop ([pos], set [pos], 1)
 
     /// Convert a knight's step into a board string
     let tourToBoard n pos =
-        Board.setPiece' (Board.empty n) BK pos 
+        Board.setPiece' (Board.empty n) black_knight pos 
 
     /// Show the knight's tour
     let show ncols pos n =
