@@ -1,13 +1,14 @@
 ﻿<Properties StartupItem="Chess/Chess.fsproj">
   <MonoDevelop.Ide.Workspace ActiveConfiguration="Debug" />
-  <MonoDevelop.Ide.Workbench ActiveDocument="Chess/Chess.fs">
+  <MonoDevelop.Ide.Workbench ActiveDocument="Chess/Combinatorics.fs">
     <Files>
-      <File FileName="Chess/Chess.fs" Line="59" Column="24" />
-      <File FileName="Chess/Script.fsx" Line="4" Column="26" />
+      <File FileName="Chess/Chess.fs" Line="1" Column="1" />
+      <File FileName="Chess/Script.fsx" Line="1" Column="1" />
       <File FileName="Chess/AssemblyInfo.fs" Line="1" Column="1" />
       <File FileName="Chess/Piece.fs" Line="6" Column="27" />
       <File FileName="Chess/Board.fs" Line="120" Column="21" />
-      <File FileName="Chess/ChessTests.fs" Line="14" Column="5" />
+      <File FileName="Chess/ChessTests.fs" Line="1" Column="1" />
+      <File FileName="Chess/Combinatorics.fs" Line="8" Column="26" />
     </Files>
   </MonoDevelop.Ide.Workbench>
   <MonoDevelop.Ide.DebuggingService.Breakpoints>

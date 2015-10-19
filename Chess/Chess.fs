@@ -50,7 +50,7 @@ module KnightsTour =
 
     /// Convert a knight's step into a board string
     let tourToBoard n pos =
-        Board.setPiece' (Board.empty n) black_knight pos 
+        Board.setPiece (Board.empty n) black_knight pos 
 
     /// Show the knight's tour
     let show ncols pos n =

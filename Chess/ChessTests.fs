@@ -21,13 +21,15 @@ module BoardTests =
     let white_pawn = Piece.create CP.White CP.Pawn
     let black_pawn = Piece.create CP.Black CP.Pawn
 
-    // Parametrized empty board test
-    let emptyBoardTest n =
-        Assert.AreEqual(Chess.Board.empty n, [| for _ in 1..n -> [| for _ in 1..n -> None|] |])
-
+(*
     [<Test>]
-    let ``4x4 EmptyBoard Is A 4 x 4 Element Array of Nones``() =
+    let ``n x n EmptyBoard Is A n x n Element Array of Empty's``() =
+        // Parametrized empty board test
+        let emptyBoardTest n =
+            Assert.AreEqual(Chess.Board.empty n, [| for _ in 1..n -> [| for _ in 1..n -> Board.Space.Empty|] |])
+        // Run test with n = 1 to 10
         List.iter emptyBoardTest [1 .. 10]
+*)
 
     [<Test>]
     let ``Show function correctly generates column names at the bottom``() =

@@ -1,9 +1,28 @@
 ﻿namespace Chess
 
 module Board =
-    type space = Piece.Piece option
-    type board = space[][]
+    type Space = 
+        private
+        | Empty
+        | Piece of Piece.Piece
+    with
+        override this.ToString() =
+            match this with
+            | Empty   -> System.Char.ConvertFromUtf32(65343)
+            | Piece p -> p.ToString()
+
+    type board = Space[][]
+
     type position = int * int
+
+    (*
+    type Board =
+        private
+        |  Spaces of Map<position, Space>
+    with
+        member this.ToString(column_count) = "1"
+    *)
+
     type move = 
         | Move of Piece.Piece * position * position
         | Castle of (Piece.Piece * position * position) * (Piece.Piece * position * position)
@@ -15,18 +34,18 @@ module Board =
     let size (b : board) = Array.length b
  
     /// Return an empty n x n board
-    let empty n : board = [|for _ in [1..n] -> [|for _ in [1..n] -> None|]|]
+    let empty n : board = [|for _ in [1..n] -> [|for _ in [1..n] -> Empty|]|]
 
     //let regex = System.Text.RegularExpressions.Regex.Match("Kn3","[A-Z]?[a-n][0-9]{1,2}")
 
     /// Convert a rank and file to a set of coordinates (for now does not allow file labels beyond the letter Z)
-//    let positionFromAlgebraic (s : string) =
-//        let s' = s.ToLower()
-//        try 
-//            let file = s'.[0]
-//            let rank = System.Double.TryParse s'.[1..]
-//        with
-//        | _ -> failwith "Invalid algebraic notation"
+    //    let positionFromAlgebraic (s : string) =
+    //        let s' = s.ToLower()
+    //        try 
+    //            let file = s'.[0]
+    //            let rank = System.Double.TryParse s'.[1..]
+    //        with
+    //        | _ -> failwith "Invalid algebraic notation"
 
         // Check if valid coordinates
         
@@ -34,25 +53,19 @@ module Board =
     let get (b : board) (i,j) = Array.get b.[i-1] (j-1)
  
     /// Return a new board with a new piece in i,j
-    let setPiece (b : board) p pos = Array.mapi (fun i row -> Array.mapi (fun j spc -> if pos = (i+1,j+1) then Some p else spc) row) b
+    let setPiece (b : board) p pos = Array.mapi (fun i row -> Array.mapi (fun j spc -> if pos = (i+1,j+1) then Piece p else spc) row) b
 
     /// Return a new board with many new pieces
     let setPieces (b : board) = Seq.fold (fun b' (p, i, j) -> setPiece b' p (i,j)) b
-
-    /// Destructive version of setPiece
-    let setPiece' (b : board) p (i, j) = Array.set b.[i-1] (j-1) (Some p); b
-
-    /// Destructively set many pieces onto the board
-    let setPieces' (b : board) = Seq.fold (fun b' (p, i, j) -> setPiece' b' p (i,j)) b
  
     /// Create a standard chess board
     let standard : board = 
-        let setPawns c i (b : board) = Array.set b (i-1) [|for _ in b.[i-1] -> Some (Piece.create c Piece.Pawn)|]; b
+        let setPawns c i (b : board) = Array.set b (i-1) [|for _ in b.[i-1] -> Piece (Piece.create c Piece.Pawn)|]; b
  
         let setBackRow c i (b : board) =
             let rnc = [|Piece.Rook; Piece.Knight; Piece.Bishop|]
             let qk  = [|Piece.Queen; Piece.King|]
-            Array.concat [rnc; qk; Array.rev rnc] |> Array.map (Some << Piece.create c) |> Array.set b (i-1); b
+            Array.concat [rnc; qk; Array.rev rnc] |> Array.map (Piece << Piece.create c) |> Array.set b (i-1); b
 
         let white, black = Piece.White, Piece.Black
 
@@ -65,16 +78,18 @@ module Board =
 
     let isEnemy b p (pos : position) =
         match get b pos with
-        | Some p' -> not (Piece.sameColor p p')
+        | Piece p' -> not (Piece.sameColor p p')
         | _       -> false
 
     let isAlly b p (pos : position) =
         match get b pos with
-        | Some p' -> Piece.sameColor p p'
+        | Piece p' -> Piece.sameColor p p'
         | _       -> false
 
     let isEmpty b (pos : position) = 
-        Option.isNone (get b pos)    
+        match get b pos with
+        | Empty -> true
+        | _     -> false   
 
     /// returns a set of positions created by moving a piece n times in series of one space moves in the direction given by (di, dj)
     /// move stops the pieces reaches another piece of the same color, the end of the board, or captures another piece
@@ -89,6 +104,13 @@ module Board =
             | Some pos' -> if n > 0 then loop (n-1, pos', Set.add pos' posns) else posns
             | None      -> posns
         loop (n, pos, Set.empty)
+
+    /// returns a set of positions created by moving a piece n times in series of one space moves in the direction given by (di, dj)
+    /// move stops the pieces reaches another piece of the same color, the end of the board, or captures another piece
+    let moveN' b n pos delta =
+        match get b pos with
+        | Empty   -> failwith "No Pieces on space (%i,%i)" (fst pos) (snd pos)
+        | Piece p -> moveN b n p pos delta
 
     /// returns the set of legal moves of a piece at a given position on the board
     let rec legalMoves b (p : Piece.Piece) pos =
@@ -128,16 +150,11 @@ module Board =
                     else legalMoves b p pos
             | _ -> legalMoves b p pos
         | _ -> legalMoves b p pos      
-
-    let private spaceToString (s:space) =
-        match s with
-        | None   -> System.Char.ConvertFromUtf32(65343)
-        | Some p -> Piece.toString p
  
     let private rowToString i =
         // adjust spacing for two digit numbers
         let f = if i >= 10 then sprintf "%i %s|" else sprintf " %i %s|"
-        (f i) << (String.concat "|") << Array.map spaceToString
+        (f i) << (String.concat "|") << Array.map (sprintf "%A")
 
     /// helper function for show; converts board to list of strings including a header
     let private toRowStrings b = 
@@ -146,7 +163,7 @@ module Board =
         let board  = Array.mapi (fun i -> rowToString (i+1)) b |> List.ofArray
         header::board
 
-    let showInColumns ncols bs =
+    let showInColumns column_count bs =
         let rec loop2 acc bn = 
             match bn with
             | []::_ -> acc
@@ -156,12 +173,12 @@ module Board =
             match acc, m, bs with
             | [], _, []          -> ans
             | _, 0, _ | _, _, [] -> let ans' = ans @ (loop2 [] (List.rev acc))
-                                    loop1 ans' [] ncols bs
+                                    loop1 ans' [] column_count bs
             | _, _, b::bs'       -> loop1 ans (b::acc) (m-1) bs'
-        loop1 [] [] ncols (List.map toRowStrings bs) |> String.concat "\n"
+        loop1 [] [] column_count (List.map toRowStrings bs) |> String.concat "\n"
 
     let show b = showInColumns 1 [b]
 
-    let printInColumns ncols = (printf "%s\n") << showInColumns ncols
+    let printInColumns column_count = (printf "%s\n") << showInColumns column_count
 
     let print b = printInColumns 1 [b]
