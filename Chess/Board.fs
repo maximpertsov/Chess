@@ -11,17 +11,11 @@ module Board =
             | Empty   -> System.Char.ConvertFromUtf32(65343)
             | Piece p -> p.ToString()
 
-    type board = Space[][]
-
     type position = int * int
 
-    (*
     type Board =
-        private
-        |  Spaces of Map<position, Space>
-    with
-        member this.ToString(column_count) = "1"
-    *)
+//        private {size: int; spaces: Space[][]}
+        private {size: int; spaces: Map<position,Space>}
 
     type move = 
         | Move of Piece.Piece * position * position
@@ -30,51 +24,50 @@ module Board =
 
     /// Add two coordinates together
     let (++) (i, j) (di, dj) = (i + di, j + dj)
-
-    let size (b : board) = Array.length b
  
     /// Return an empty n x n board
-    let empty n : board = [|for _ in [1..n] -> [|for _ in [1..n] -> Empty|]|]
+    let empty n : Board = 
+//        {size=n; spaces=[|for _ in [1..n] -> [|for _ in [1..n] -> Empty|]|]}
+        {size=n; spaces=Map.empty}
 
-    //let regex = System.Text.RegularExpressions.Regex.Match("Kn3","[A-Z]?[a-n][0-9]{1,2}")
+    // Get the size of one side of a board
+    let size (b : Board) = b.size
 
-    /// Convert a rank and file to a set of coordinates (for now does not allow file labels beyond the letter Z)
-    //    let positionFromAlgebraic (s : string) =
-    //        let s' = s.ToLower()
-    //        try 
-    //            let file = s'.[0]
-    //            let rank = System.Double.TryParse s'.[1..]
-    //        with
-    //        | _ -> failwith "Invalid algebraic notation"
-
-        // Check if valid coordinates
-        
-    /// Return the space located on coordinates i,j of the chessboard
-    let get (b : board) (i,j) = Array.get b.[i-1] (j-1)
- 
-    /// Return a new board with a new piece in i,j
-    let setPiece (b : board) p pos = Array.mapi (fun i row -> Array.mapi (fun j spc -> if pos = (i+1,j+1) then Piece p else spc) row) b
-
-    /// Return a new board with many new pieces
-    let setPieces (b : board) = Seq.fold (fun b' (p, i, j) -> setPiece b' p (i,j)) b
- 
-    /// Create a standard chess board
-    let standard : board = 
-        let setPawns c i (b : board) = Array.set b (i-1) [|for _ in b.[i-1] -> Piece (Piece.create c Piece.Pawn)|]; b
- 
-        let setBackRow c i (b : board) =
-            let rnc = [|Piece.Rook; Piece.Knight; Piece.Bishop|]
-            let qk  = [|Piece.Queen; Piece.King|]
-            Array.concat [rnc; qk; Array.rev rnc] |> Array.map (Piece << Piece.create c) |> Array.set b (i-1); b
-
-        let white, black = Piece.White, Piece.Black
-
-        empty 8 |> setBackRow white 1 |> setPawns white 2 |> setPawns black 7 |> setBackRow black 8
-
-    let isOffBoard b (pos : position) =
-        let i,j = pos
+    /// Check if a position is off the board
+    let isOffBoard b (i,j) =
         let n = size b
         i < 1 || j < 1 || i > n || j > n
+
+    /// Return the space located on coordinates i,j of the chessboard
+    let get (b : Board) (i,j) = 
+        if isOffBoard b (i,j) then 
+            failwith "Space (%i,%i) is not on the board" i j
+        else
+//            Array.get b.spaces.[i-1] (j-1)
+            match Map.tryFind (i,j) b.spaces with
+            | None   -> Empty
+            | Some p -> p
+
+    /// Return a new board with a new piece in i,j
+    let setPiece (b : Board) p pos = 
+        if isOffBoard b pos then 
+            failwith "Space (%i,%i) is not on the board" (fst pos) (snd pos)
+        else
+//            {size=(size b); spaces=Array.mapi (fun i row -> Array.mapi (fun j spc -> if pos = (i,j) ++ (1,1) then Piece p else spc) row) b.spaces}
+            {size=(size b); spaces=Map.add pos (Piece p) b.spaces}
+
+    /// Return a new board with many new pieces
+    let setPieces (b : Board) = Seq.fold (fun b' (p, i, j) -> setPiece b' p (i,j)) b
+ 
+    /// Create a standard chess board
+    let standard : Board = 
+        let setPawns c i (b : Board) = setPieces b [for j in 1..(size b) -> (Piece.create' c "pawn", i, j)]
+     
+        let setBackRow c i (b : Board) = 
+            let backPieces c = List.map (Piece.create' c) ["rook"; "knight"; "bishop"; "queen"; "king"; "bishop"; "knight"; "rook"]
+            setPieces b (List.zip3 (backPieces c) [for _ in 1..(size b) -> i] [for j in 1..(size b) -> j])
+
+        empty 8 |> setBackRow "white" 1 |> setPawns "white" 2 |> setPawns "black" 7 |> setBackRow "black" 8
 
     let isEnemy b p (pos : position) =
         match get b pos with
@@ -101,7 +94,8 @@ module Board =
             else Some pos'
         let rec loop (n, pos, posns) =
             match move1 pos with
-            | Some pos' -> if n > 0 then loop (n-1, pos', Set.add pos' posns) else posns
+            | Some pos' -> if n > 0 then loop (n-1, pos', Set.add pos' posns) 
+                           else posns
             | None      -> posns
         loop (n, pos, Set.empty)
 
@@ -150,17 +144,19 @@ module Board =
                     else legalMoves b p pos
             | _ -> legalMoves b p pos
         | _ -> legalMoves b p pos      
- 
-    let private rowToString i =
-        // adjust spacing for two digit numbers
-        let f = if i >= 10 then sprintf "%i %s|" else sprintf " %i %s|"
-        (f i) << (String.concat "|") << Array.map (sprintf "%A")
 
     /// helper function for show; converts board to list of strings including a header
-    let private toRowStrings b = 
+    let private toRowStrings (b:Board) = 
         let alphabet = [|for i in 65313..(65313 + 25) -> System.Char.ConvertFromUtf32 i|]
-        let header = sprintf "   %s " (alphabet.[0 .. Array.length b - 1] |> String.concat " ")
-        let board  = Array.mapi (fun i -> rowToString (i+1)) b |> List.ofArray
+        let header = alphabet.[0 .. (size b - 1)] |> String.concat " " |> sprintf "   %s "
+        let board  = 
+            let rowToString i =
+                [|for j in 1..(size b) -> get b (i,j)|]
+                |> Array.map (sprintf "%A")
+                |> (String.concat "|")
+                // adjust spacing for two digit numbers
+                |> (if i >= 10 then sprintf "%i %s|" else sprintf " %i %s|") i
+            [for i in 1..(size b) -> rowToString i]
         header::board
 
     let showInColumns column_count bs =
@@ -179,6 +175,19 @@ module Board =
 
     let show b = showInColumns 1 [b]
 
-    let printInColumns column_count = (printf "%s\n") << showInColumns column_count
+    let printInColumns column_count = (printf "%s\n") << (showInColumns column_count)
 
     let print b = printInColumns 1 [b]
+
+    //let regex = System.Text.RegularExpressions.Regex.Match("Kn3","[A-Z]?[a-n][0-9]{1,2}")
+
+    /// Convert a rank and file to a set of coordinates (for now does not allow file labels beyond the letter Z)
+    //    let positionFromAlgebraic (s : string) =
+    //        let s' = s.ToLower()
+    //        try 
+    //            let file = s'.[0]
+    //            let rank = System.Double.TryParse s'.[1..]
+    //        with
+    //        | _ -> failwith "Invalid algebraic notation"
+
+        // Check if valid coordinates
